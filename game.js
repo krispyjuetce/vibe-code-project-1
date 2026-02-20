@@ -43,8 +43,11 @@ const COLOR_BLOCK_GAP = 8;
 const COLOR_SHOT_SPEED = 730;
 const COLOR_PALETTE = ["#2ffff5", "#7e8bff", "#ff6aa8", "#ffe66f", "#56ff87"];
 
-const LEADERBOARD_STORAGE_KEY = "neon_arcade_leaderboards_v1";
 const LEADERBOARD_SIZE = 5;
+const SUPABASE_URL = "https://sofswyitwkkewfszlors.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNvZnN3eWl0d2trZXdmc3psb3JzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODIzMTcsImV4cCI6MjA4NzE1ODMxN30.vHsAH5pDaHinPQpvcbF5h8qVex82kiwlCVDSRlfgci0";
+const SUPABASE_TABLE = "leaderboard_entries";
 
 let activeGame = "runner";
 let lastTime = performance.now();
@@ -56,7 +59,7 @@ let runnerState = null;
 let fluxState = null;
 let colorState = null;
 let mouseCanvasPos = { x: canvas.width / 2, y: canvas.height / 2 };
-let leaderboards = loadLeaderboards();
+let leaderboards = emptyLeaderboards();
 
 function emptyLeaderboards() {
   return { runner: [], whack: [], flux: [], color: [] };
@@ -103,24 +106,72 @@ function compareBoardEntries(game, a, b) {
   return b.score - a.score || new Date(a.date) - new Date(b.date);
 }
 
-function loadLeaderboards() {
+async function fetchLeaderboardFromSupabase(game) {
+  const direction = isLowerBetter(game) ? "asc" : "desc";
+  const url =
+    `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}` +
+    `?select=player_name,score,created_at` +
+    `&game=eq.${encodeURIComponent(game)}` +
+    `&order=score.${direction},created_at.asc` +
+    `&limit=${LEADERBOARD_SIZE}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Leaderboard fetch failed (${response.status})`);
+  }
+
+  const rows = await response.json();
+  return normalizeBoard(
+    game,
+    rows.map((row) => ({
+      name: row.player_name,
+      score: Number(row.score),
+      date: row.created_at,
+    }))
+  );
+}
+
+async function refreshLeaderboard(game) {
   try {
-    const raw = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
-    if (!raw) return emptyLeaderboards();
-    const parsed = JSON.parse(raw);
-    return {
-      runner: normalizeBoard("runner", parsed.runner),
-      whack: normalizeBoard("whack", parsed.whack),
-      flux: normalizeBoard("flux", parsed.flux),
-      color: normalizeBoard("color", parsed.color),
-    };
+    leaderboards[game] = await fetchLeaderboardFromSupabase(game);
+    if (activeBoard === game && !leaderboardModalEl.classList.contains("hidden")) {
+      renderLeaderboard(game);
+    }
   } catch {
-    return emptyLeaderboards();
+    // Keep last known in-memory leaderboard on network/API failures.
   }
 }
 
-function saveLeaderboards() {
-  localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(leaderboards));
+async function refreshAllLeaderboards() {
+  await Promise.all(["runner", "whack", "flux", "color"].map((game) => refreshLeaderboard(game)));
+}
+
+async function submitLeaderboardEntry(game, name, score) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      game,
+      player_name: name,
+      score,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Leaderboard submit failed (${response.status})`);
+  }
 }
 
 function qualifiesForLeaderboard(game, score) {
@@ -148,8 +199,8 @@ function recordLeaderboardScore(game, score) {
   board.sort((a, b) => compareBoardEntries(game, a, b));
   leaderboards[game] = board.slice(0, LEADERBOARD_SIZE);
 
-  saveLeaderboards();
   renderLeaderboard(activeBoard);
+  submitLeaderboardEntry(game, name, numericScore).then(() => refreshLeaderboard(game));
   return true;
 }
 
@@ -195,6 +246,7 @@ function escapeHtml(value) {
 function openLeaderboardModal() {
   leaderboardModalEl.classList.remove("hidden");
   leaderboardModalEl.setAttribute("aria-hidden", "false");
+  refreshLeaderboard(activeBoard);
   renderLeaderboard(activeBoard);
 }
 
@@ -206,6 +258,7 @@ function closeLeaderboardModal() {
 function setActiveBoard(board) {
   activeBoard = board;
   boardTabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.board === board));
+  refreshLeaderboard(board);
   renderLeaderboard(board);
 }
 
@@ -1426,6 +1479,7 @@ resetWhackGame();
 resetRunnerGame();
 resetFluxGame();
 resetColorGame();
+refreshAllLeaderboards();
 setActiveBoard("runner");
 activateGame("runner");
 requestAnimationFrame(gameLoop);
