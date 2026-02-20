@@ -1361,22 +1361,22 @@ function onKeyDown(event) {
 
   if (activeGame === "whack" && whackState.gameOver) {
     resetWhackGame();
-    statusLineEl.textContent = "Press S to start.";
+    startCurrentGame();
   }
 
   if (activeGame === "runner" && runnerState.gameOver) {
     resetRunnerGame();
-    statusLineEl.textContent = "Press S to start.";
+    startCurrentGame();
   }
 
   if (activeGame === "flux" && fluxState.gameOver) {
     resetFluxGame();
-    statusLineEl.textContent = "Press S to start.";
+    startCurrentGame();
   }
 
   if (activeGame === "color" && colorState.gameOver) {
     resetColorGame();
-    statusLineEl.textContent = "Press S to start.";
+    startCurrentGame();
   }
 }
 
