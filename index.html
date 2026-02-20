@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neon Arcade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-shape bg-shape-a"></div>
+  <div class="bg-shape bg-shape-b"></div>
+
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Game Hub</p>
+      <h1>Neon Arcade</h1>
+    </div>
+    <div class="top-actions">
+      <p class="tagline">A growing collection of browser mini-games.</p>
+      <button id="leaderboardToggle" class="neon-btn" type="button">Leaderboards</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="library-panel">
+      <h2>Library</h2>
+      <div class="game-list">
+        <article class="game-card" data-game="whack">
+          <p class="game-name">Whack a Mole: Neon Grid</p>
+          <p class="game-meta">Live now</p>
+        </article>
+        <article class="game-card active" data-game="runner">
+          <p class="game-name">Hyper Runner</p>
+          <p class="game-meta">Live now</p>
+        </article>
+        <article class="game-card" data-game="flux">
+          <p class="game-name">Memory Flux</p>
+          <p class="game-meta">Live now</p>
+        </article>
+        <article class="game-card" data-game="color">
+          <p class="game-name">Color Block</p>
+          <p class="game-meta">Live now</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="game-panel">
+      <div class="hud">
+        <p id="score">Score: 0</p>
+        <p id="respawn">Respawn: 1.00s</p>
+        <p id="health">Health: 5</p>
+      </div>
+
+      <canvas id="gameCanvas" width="820" height="560" aria-label="Neon arcade game"></canvas>
+
+      <div class="rules">
+        <p id="ruleLine1"><strong>Hyper Runner:</strong> Click to jump over neon obstacles.</p>
+        <p id="ruleLine2">Avoid collisions and survive as speed increases.</p>
+        <p id="statusLine">Press <kbd>R</kbd> to restart when game over.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="leaderboardModal" class="leaderboard-modal hidden" aria-hidden="true">
+    <div class="leaderboard-panel">
+      <div class="leaderboard-head">
+        <h2>Top 5 Leaderboards</h2>
+        <button id="leaderboardClose" class="neon-btn ghost" type="button">Close</button>
+      </div>
+      <div class="board-tabs">
+        <button class="board-tab active" data-board="runner" type="button">Hyper Runner</button>
+        <button class="board-tab" data-board="whack" type="button">Whack a Mole</button>
+        <button class="board-tab" data-board="flux" type="button">Memory Flux</button>
+        <button class="board-tab" data-board="color" type="button">Color Block</button>
+      </div>
+      <div id="leaderboardTableWrap"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
