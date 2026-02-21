@@ -63,6 +63,7 @@ let runnerState = null;
 let fluxState = null;
 let colorState = null;
 let mouseCanvasPos = { x: canvas.width / 2, y: canvas.height / 2 };
+let colorTouchAiming = false;
 let leaderboards = emptyLeaderboards();
 
 function emptyLeaderboards() {
@@ -314,8 +315,9 @@ function randBool() {
 }
 
 function buildGridRects() {
-  const gridWidth = canvas.width - GRID_PADDING * 2;
-  const gridHeight = canvas.height - GRID_PADDING * 2;
+  const padding = getWhackPadding();
+  const gridWidth = canvas.width - padding * 2;
+  const gridHeight = canvas.height - padding * 2;
   const cellWidth = gridWidth / GRID_COLS;
   const cellHeight = gridHeight / GRID_ROWS;
   const size = Math.min(cellWidth, cellHeight) - 26;
@@ -323,8 +325,8 @@ function buildGridRects() {
   const rects = [];
   for (let r = 0; r < GRID_ROWS; r += 1) {
     for (let c = 0; c < GRID_COLS; c += 1) {
-      const cellX = GRID_PADDING + c * cellWidth;
-      const cellY = GRID_PADDING + r * cellHeight;
+      const cellX = padding + c * cellWidth;
+      const cellY = padding + r * cellHeight;
       rects.push({
         x: cellX + (cellWidth - size) / 2,
         y: cellY + (cellHeight - size) / 2,
@@ -407,9 +409,9 @@ function buildFluxPath(rows, cols) {
 }
 
 function getFluxGeometry() {
-  const gap = 6;
-  const maxWidth = canvas.width - 180;
-  const maxHeight = canvas.height - 90;
+  const gap = isMobileLikeDevice() ? 5 : 6;
+  const maxWidth = isMobileLikeDevice() ? canvas.width - 18 : canvas.width - 180;
+  const maxHeight = isMobileLikeDevice() ? canvas.height - 40 : canvas.height - 90;
 
   const cellW = (maxWidth - gap * (FLUX_COLS - 1)) / FLUX_COLS;
   const cellH = (maxHeight - gap * (FLUX_ROWS - 1)) / FLUX_ROWS;
@@ -718,9 +720,30 @@ function isMobileLikeDevice() {
   return window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 920;
 }
 
+function isPortraitGame(game) {
+  return game === "whack" || game === "flux";
+}
+
 function requiredOrientation(game) {
-  if (game === "whack" || game === "flux") return "portrait";
+  if (isPortraitGame(game)) return "portrait";
   return "landscape";
+}
+
+function updateCanvasForActiveGame() {
+  const mobile = isMobileLikeDevice();
+  const portraitMode = isPortraitGame(activeGame);
+  const targetWidth = mobile && portraitMode ? 560 : 820;
+  const targetHeight = mobile && portraitMode ? 900 : 560;
+
+  if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+  }
+}
+
+function getWhackPadding() {
+  if (!isMobileLikeDevice()) return GRID_PADDING;
+  return Math.max(12, Math.floor(canvas.width * 0.03));
 }
 
 function isOrientationValid(game) {
@@ -811,6 +834,8 @@ function startCurrentGame() {
 
 function activateGame(game) {
   activeGame = game;
+  updateCanvasForActiveGame();
+  gridRects = buildGridRects();
   gameCards.forEach((card) => {
     card.classList.toggle("active", card.dataset.game === activeGame);
   });
@@ -867,8 +892,9 @@ function drawCenterOverlay(title, subtitle, titleColor = "#ff99bf") {
 }
 
 function drawWhackGrid() {
-  const gridWidth = canvas.width - GRID_PADDING * 2;
-  const gridHeight = canvas.height - GRID_PADDING * 2;
+  const padding = getWhackPadding();
+  const gridWidth = canvas.width - padding * 2;
+  const gridHeight = canvas.height - padding * 2;
   const cellWidth = gridWidth / GRID_COLS;
   const cellHeight = gridHeight / GRID_ROWS;
 
@@ -879,18 +905,18 @@ function drawWhackGrid() {
   ctx.lineWidth = 2;
 
   for (let c = 0; c <= GRID_COLS; c += 1) {
-    const x = GRID_PADDING + c * cellWidth;
+    const x = padding + c * cellWidth;
     ctx.beginPath();
-    ctx.moveTo(x, GRID_PADDING);
-    ctx.lineTo(x, GRID_PADDING + gridHeight);
+    ctx.moveTo(x, padding);
+    ctx.lineTo(x, padding + gridHeight);
     ctx.stroke();
   }
 
   for (let r = 0; r <= GRID_ROWS; r += 1) {
-    const y = GRID_PADDING + r * cellHeight;
+    const y = padding + r * cellHeight;
     ctx.beginPath();
-    ctx.moveTo(GRID_PADDING, y);
-    ctx.lineTo(GRID_PADDING + gridWidth, y);
+    ctx.moveTo(padding, y);
+    ctx.lineTo(padding + gridWidth, y);
     ctx.stroke();
   }
   ctx.restore();
@@ -1244,6 +1270,26 @@ function handleFluxClick(x, y) {
   statusLineEl.textContent = "Wrong tile. You hit lava. Press R to restart.";
 }
 
+function fireColorShot(targetX, targetY) {
+  if (!colorState.started || colorState.gameOver || colorState.shot || !colorState.nextColor) return;
+
+  let dx = targetX - colorState.origin.x;
+  let dy = targetY - colorState.origin.y;
+  if (dy > -18) dy = -18;
+  const mag = Math.hypot(dx, dy) || 1;
+  dx /= mag;
+  dy /= mag;
+
+  colorState.shot = {
+    x: colorState.origin.x,
+    y: colorState.origin.y,
+    vx: dx * COLOR_SHOT_SPEED,
+    vy: dy * COLOR_SHOT_SPEED,
+    r: 10,
+    color: colorState.nextColor,
+  };
+}
+
 function updateColor(dt, now) {
   if (!isOrientationValid("color")) {
     scoreEl.textContent = `Score: ${colorState.score}`;
@@ -1437,21 +1483,13 @@ function onPointerDown(event) {
   if (activeGame === "color") {
     if (!colorState.started || colorState.gameOver || colorState.shot || !colorState.nextColor) return;
 
-    let dx = x - colorState.origin.x;
-    let dy = y - colorState.origin.y;
-    if (dy > -18) dy = -18;
-    const mag = Math.hypot(dx, dy) || 1;
-    dx /= mag;
-    dy /= mag;
+    if (isMobileLikeDevice()) {
+      colorTouchAiming = true;
+      mouseCanvasPos = { x, y };
+      return;
+    }
 
-    colorState.shot = {
-      x: colorState.origin.x,
-      y: colorState.origin.y,
-      vx: dx * COLOR_SHOT_SPEED,
-      vy: dy * COLOR_SHOT_SPEED,
-      r: 10,
-      color: colorState.nextColor,
-    };
+    fireColorShot(x, y);
     return;
   }
 
@@ -1466,6 +1504,20 @@ function onPointerMove(event) {
     x: (event.clientX - rect.left) * scaleX,
     y: (event.clientY - rect.top) * scaleY,
   };
+}
+
+function onPointerUp(event) {
+  if (activeGame !== "color" || !isMobileLikeDevice() || !colorTouchAiming) return;
+  colorTouchAiming = false;
+  if (!isOrientationValid("color")) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (event.clientX - rect.left) * scaleX;
+  const y = (event.clientY - rect.top) * scaleY;
+  mouseCanvasPos = { x, y };
+  fireColorShot(x, y);
 }
 
 function onKeyDown(event) {
@@ -1566,9 +1618,21 @@ swapColorBtnEl.addEventListener("click", () => {
 
 canvas.addEventListener("pointerdown", onPointerDown);
 canvas.addEventListener("pointermove", onPointerMove);
-window.addEventListener("resize", updateOverlayControls);
+canvas.addEventListener("pointerup", onPointerUp);
+canvas.addEventListener("pointercancel", () => {
+  colorTouchAiming = false;
+});
+window.addEventListener("resize", () => {
+  updateCanvasForActiveGame();
+  gridRects = buildGridRects();
+  if (activeGame === "runner") resetRunnerGame();
+  if (activeGame === "flux") resetFluxGame();
+  if (activeGame === "color") resetColorGame();
+  updateOverlayControls();
+});
 window.addEventListener("keydown", onKeyDown);
 
+updateCanvasForActiveGame();
 gridRects = buildGridRects();
 resetWhackGame();
 resetRunnerGame();
