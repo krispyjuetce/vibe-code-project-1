@@ -342,3 +342,32 @@ kbd {
     bottom: 10px;
   }
 }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .topbar {
+    margin: 8px auto 6px;
+  }
+
+  .layout {
+    margin: 0 auto 10px;
+    gap: 10px;
+  }
+
+  .game-panel {
+    padding: 8px;
+  }
+
+  .hud {
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+  }
+
+  .rules {
+    margin-top: 6px;
+  }
+
+  .rules p {
+    margin: 2px 0;
+    font-size: 0.82rem;
+  }
+}

@@ -732,8 +732,17 @@ function requiredOrientation(game) {
 function updateCanvasForActiveGame() {
   const mobile = isMobileLikeDevice();
   const portraitMode = isPortraitGame(activeGame);
-  const targetWidth = mobile && portraitMode ? 560 : 820;
-  const targetHeight = mobile && portraitMode ? 900 : 560;
+  let targetWidth = 820;
+  let targetHeight = 560;
+
+  if (mobile && portraitMode) {
+    targetWidth = 560;
+    targetHeight = 900;
+  } else if (mobile && !portraitMode) {
+    // Keep landscape games fully visible on short mobile viewports (HUD + top rows included).
+    targetWidth = 820;
+    targetHeight = Math.max(240, Math.min(380, Math.floor(window.innerHeight - 180)));
+  }
 
   if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
     canvas.width = targetWidth;
