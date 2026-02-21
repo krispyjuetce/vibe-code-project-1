@@ -741,9 +741,7 @@ function isMobileLikeDevice() {
 }
 
 function isPortraitGame(game) {
-  if (game === "whack" || game === "flux") return true;
-  if (game === "color" && isMobileLikeDevice()) return true;
-  return false;
+  return game === "whack" || game === "flux" || game === "color";
 }
 
 function requiredOrientation(game) {
