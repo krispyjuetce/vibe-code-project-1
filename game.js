@@ -497,12 +497,22 @@ function buildColorBoard() {
 }
 
 function colorBoardGeometry() {
-  const boardWidth = COLOR_BLOCK_COLS * COLOR_BLOCK_SIZE + (COLOR_BLOCK_COLS - 1) * COLOR_BLOCK_GAP;
+  const portraitMobile = isMobileLikeDevice() && isPortraitGame("color");
+  const gap = COLOR_BLOCK_GAP;
+  const size = portraitMobile
+    ? Math.floor(
+        (canvas.width - Math.max(18, Math.floor(canvas.width * 0.04)) * 2 - (COLOR_BLOCK_COLS - 1) * gap) /
+          COLOR_BLOCK_COLS
+      )
+    : COLOR_BLOCK_SIZE;
+  const boardWidth = COLOR_BLOCK_COLS * size + (COLOR_BLOCK_COLS - 1) * gap;
   return {
     left: (canvas.width - boardWidth) / 2,
-    top: 58,
+    top: portraitMobile ? 86 : 58,
+    size,
+    gap,
     boardWidth,
-    boardHeight: COLOR_BLOCK_ROWS * COLOR_BLOCK_SIZE + (COLOR_BLOCK_ROWS - 1) * COLOR_BLOCK_GAP,
+    boardHeight: COLOR_BLOCK_ROWS * size + (COLOR_BLOCK_ROWS - 1) * gap,
   };
 }
 
@@ -531,10 +541,10 @@ function resetColorGame() {
 
 function colorCellRect(row, col) {
   return {
-    x: colorState.geometry.left + col * (COLOR_BLOCK_SIZE + COLOR_BLOCK_GAP),
-    y: colorState.geometry.top + row * (COLOR_BLOCK_SIZE + COLOR_BLOCK_GAP),
-    w: COLOR_BLOCK_SIZE,
-    h: COLOR_BLOCK_SIZE,
+    x: colorState.geometry.left + col * (colorState.geometry.size + colorState.geometry.gap),
+    y: colorState.geometry.top + row * (colorState.geometry.size + colorState.geometry.gap),
+    w: colorState.geometry.size,
+    h: colorState.geometry.size,
   };
 }
 
@@ -612,7 +622,11 @@ function clearColorClusterFrom(startRow, startCol, targetColor) {
 
 function colorBoardBottomY() {
   const rows = colorState.board.length;
-  return colorState.geometry.top + rows * COLOR_BLOCK_SIZE + (rows - 1) * COLOR_BLOCK_GAP;
+  return (
+    colorState.geometry.top +
+    rows * colorState.geometry.size +
+    (rows - 1) * colorState.geometry.gap
+  );
 }
 
 function rollShooterChoices() {
@@ -686,8 +700,14 @@ function attachMisfiredBlock(hitRow, hitCol, shot) {
   let best = candidates[0];
   let bestDist = Number.POSITIVE_INFINITY;
   for (const c of candidates) {
-    const centerX = colorState.geometry.left + c.col * (COLOR_BLOCK_SIZE + COLOR_BLOCK_GAP) + COLOR_BLOCK_SIZE / 2;
-    const centerY = colorState.geometry.top + c.row * (COLOR_BLOCK_SIZE + COLOR_BLOCK_GAP) + COLOR_BLOCK_SIZE / 2;
+    const centerX =
+      colorState.geometry.left +
+      c.col * (colorState.geometry.size + colorState.geometry.gap) +
+      colorState.geometry.size / 2;
+    const centerY =
+      colorState.geometry.top +
+      c.row * (colorState.geometry.size + colorState.geometry.gap) +
+      colorState.geometry.size / 2;
     const dist = (centerX - shot.x) ** 2 + (centerY - shot.y) ** 2;
     if (dist < bestDist) {
       bestDist = dist;
@@ -721,7 +741,9 @@ function isMobileLikeDevice() {
 }
 
 function isPortraitGame(game) {
-  return game === "whack" || game === "flux";
+  if (game === "whack" || game === "flux") return true;
+  if (game === "color" && isMobileLikeDevice()) return true;
+  return false;
 }
 
 function requiredOrientation(game) {
