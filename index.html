@@ -54,7 +54,14 @@
         <p id="health">Health: 5</p>
       </div>
 
-      <canvas id="gameCanvas" width="820" height="560" aria-label="Neon arcade game"></canvas>
+      <div class="game-stage">
+        <canvas id="gameCanvas" width="820" height="560" aria-label="Neon arcade game"></canvas>
+        <div id="gameOverlayUi" class="game-overlay-ui hidden" aria-hidden="true">
+          <p id="overlayMessage">Press S to start</p>
+          <button id="overlayActionBtn" class="neon-btn" type="button">Start Game</button>
+        </div>
+        <button id="swapColorBtn" class="neon-btn swap-btn hidden" type="button">Swap Color</button>
+      </div>
 
       <div class="rules">
         <p id="ruleLine1"><strong>Hyper Runner:</strong> Click to jump over neon obstacles.</p>

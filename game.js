@@ -14,6 +14,10 @@ const leaderboardModalEl = document.getElementById("leaderboardModal");
 const leaderboardCloseEl = document.getElementById("leaderboardClose");
 const leaderboardTableWrapEl = document.getElementById("leaderboardTableWrap");
 const boardTabs = Array.from(document.querySelectorAll(".board-tab"));
+const gameOverlayUiEl = document.getElementById("gameOverlayUi");
+const overlayMessageEl = document.getElementById("overlayMessage");
+const overlayActionBtnEl = document.getElementById("overlayActionBtn");
+const swapColorBtnEl = document.getElementById("swapColorBtn");
 
 const GRID_COLS = 4;
 const GRID_ROWS = 3;
@@ -710,7 +714,68 @@ function intersects(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+function isMobileLikeDevice() {
+  return window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 920;
+}
+
+function requiredOrientation(game) {
+  if (game === "whack" || game === "flux") return "portrait";
+  return "landscape";
+}
+
+function isOrientationValid(game) {
+  if (!isMobileLikeDevice()) return true;
+  const portrait = window.innerHeight >= window.innerWidth;
+  const required = requiredOrientation(game);
+  return required === "portrait" ? portrait : !portrait;
+}
+
+function getGameState(game) {
+  if (game === "whack") return whackState;
+  if (game === "runner") return runnerState;
+  if (game === "flux") return fluxState;
+  return colorState;
+}
+
+function updateOverlayControls() {
+  const state = getGameState(activeGame);
+  if (!state) return;
+
+  if (!isOrientationValid(activeGame)) {
+    gameOverlayUiEl.classList.remove("hidden");
+    gameOverlayUiEl.setAttribute("aria-hidden", "false");
+    overlayMessageEl.textContent = `Rotate to ${requiredOrientation(activeGame)} to play`;
+    overlayActionBtnEl.classList.add("hidden");
+    swapColorBtnEl.classList.add("hidden");
+    return;
+  }
+
+  const showStart = !state.started;
+  const showRestart = state.gameOver;
+  const showOverlay = showStart || showRestart;
+
+  gameOverlayUiEl.classList.toggle("hidden", !showOverlay);
+  gameOverlayUiEl.setAttribute("aria-hidden", showOverlay ? "false" : "true");
+  if (showStart) {
+    overlayMessageEl.textContent = "Ready to play?";
+    overlayActionBtnEl.textContent = "Start Game";
+    overlayActionBtnEl.classList.remove("hidden");
+  } else if (showRestart) {
+    overlayMessageEl.textContent = "Round complete";
+    overlayActionBtnEl.textContent = "Restart Game";
+    overlayActionBtnEl.classList.remove("hidden");
+  }
+
+  const showSwap = activeGame === "color" && state.started && !state.gameOver;
+  swapColorBtnEl.classList.toggle("hidden", !showSwap);
+}
+
 function startCurrentGame() {
+  if (!isOrientationValid(activeGame)) {
+    statusLineEl.textContent = `Rotate to ${requiredOrientation(activeGame)} orientation.`;
+    return;
+  }
+
   const now = performance.now();
 
   if (activeGame === "whack" && !whackState.started) {
@@ -832,6 +897,13 @@ function drawWhackGrid() {
 }
 
 function updateWhack(now) {
+  if (!isOrientationValid("whack")) {
+    scoreEl.textContent = `Score: ${whackState.score}`;
+    healthEl.textContent = `Health: ${whackState.health}`;
+    respawnEl.textContent = "Respawn: 1.00s";
+    return;
+  }
+
   if (!whackState.started) {
     scoreEl.textContent = `Score: ${whackState.score}`;
     healthEl.textContent = `Health: ${whackState.health}`;
@@ -869,11 +941,6 @@ function renderWhack() {
   const hit = whackState.moleIsBlue ? BLUE_HIT : RED_HIT;
   const color = whackState.moleHit ? hit : base;
   drawGlowRect(rect.x, rect.y, rect.w, rect.h, color);
-
-  if (!whackState.started) {
-    drawCenterOverlay("Whack a Mole", "Press S to start");
-    return;
-  }
 
   if (whackState.gameOver) {
     drawCenterOverlay("Game Over", "Press R to restart");
@@ -924,6 +991,13 @@ function drawObstacle(obstacle) {
 }
 
 function updateRunner(dt) {
+  if (!isOrientationValid("runner")) {
+    scoreEl.textContent = `Distance: ${Math.floor(runnerState.score)}`;
+    healthEl.textContent = "State: Rotate device";
+    respawnEl.textContent = `Speed: ${Math.floor(runnerState.speed)} px/s`;
+    return;
+  }
+
   if (!runnerState.started) {
     scoreEl.textContent = "Distance: 0";
     healthEl.textContent = "State: Ready";
@@ -1036,17 +1110,19 @@ function renderRunner() {
     28
   );
 
-  if (!runnerState.started) {
-    drawCenterOverlay("Hyper Runner", "Press S to start");
-    return;
-  }
-
   if (runnerState.gameOver) {
     drawCenterOverlay("Game Over", "Press R to restart");
   }
 }
 
 function updateFlux(now) {
+  if (!isOrientationValid("flux")) {
+    scoreEl.textContent = `Progress: ${fluxState.nextIndex}/${fluxState.path.length}`;
+    respawnEl.textContent = "Memorize: 3.0s";
+    healthEl.textContent = "Status: Rotate device";
+    return;
+  }
+
   if (!fluxState.started) {
     scoreEl.textContent = `Progress: ${fluxState.nextIndex}/${fluxState.path.length}`;
     respawnEl.textContent = "Memorize: 3.0s";
@@ -1135,11 +1211,6 @@ function drawFluxGrid() {
 function renderFlux() {
   drawFluxGrid();
 
-  if (!fluxState.started) {
-    drawCenterOverlay("Memory Flux", "Press S to start");
-    return;
-  }
-
   if (fluxState.gameOver && fluxState.won) {
     drawCenterOverlay("Path Complete", "Press R to restart", "#8bffc6");
   } else if (fluxState.gameOver) {
@@ -1174,6 +1245,13 @@ function handleFluxClick(x, y) {
 }
 
 function updateColor(dt, now) {
+  if (!isOrientationValid("color")) {
+    scoreEl.textContent = `Score: ${colorState.score}`;
+    respawnEl.textContent = `Time: ${(colorState.elapsedMs / 1000).toFixed(1)}s / 120.0s`;
+    healthEl.textContent = "Blocks Left: paused";
+    return;
+  }
+
   if (!colorState.started) {
     scoreEl.textContent = `Score: ${colorState.score}`;
     respawnEl.textContent = "Time: 0.0s / 120.0s";
@@ -1321,11 +1399,6 @@ function renderColor() {
     ctx.restore();
   }
 
-  if (!colorState.started) {
-    drawCenterOverlay("Color Block", "Press S to start");
-    return;
-  }
-
   if (colorState.gameOver && colorState.won) {
     drawCenterOverlay("Board Cleared", "Press R to restart", "#8bffc6");
   } else if (colorState.gameOver) {
@@ -1334,6 +1407,8 @@ function renderColor() {
 }
 
 function onPointerDown(event) {
+  if (!isOrientationValid(activeGame)) return;
+
   if (activeGame === "runner") {
     if (!runnerState.started || runnerState.gameOver) return;
     if (runnerState.player.grounded || runnerState.coyoteTime > 0) {
@@ -1433,6 +1508,18 @@ function onKeyDown(event) {
   }
 }
 
+function onOverlayAction() {
+  const state = getGameState(activeGame);
+  if (!state) return;
+  if (state.gameOver) {
+    if (activeGame === "whack") resetWhackGame();
+    else if (activeGame === "runner") resetRunnerGame();
+    else if (activeGame === "flux") resetFluxGame();
+    else resetColorGame();
+  }
+  startCurrentGame();
+}
+
 function gameLoop(now) {
   const dt = Math.min(0.033, (now - lastTime) / 1000);
   lastTime = now;
@@ -1453,6 +1540,7 @@ function gameLoop(now) {
     renderColor();
   }
 
+  updateOverlayControls();
   requestAnimationFrame(gameLoop);
 }
 
@@ -1469,9 +1557,16 @@ leaderboardCloseEl.addEventListener("click", closeLeaderboardModal);
 leaderboardModalEl.addEventListener("click", (event) => {
   if (event.target === leaderboardModalEl) closeLeaderboardModal();
 });
+overlayActionBtnEl.addEventListener("click", onOverlayAction);
+swapColorBtnEl.addEventListener("click", () => {
+  if (activeGame !== "color") return;
+  if (!colorState.started || colorState.gameOver) return;
+  toggleShooterColor();
+});
 
 canvas.addEventListener("pointerdown", onPointerDown);
 canvas.addEventListener("pointermove", onPointerMove);
+window.addEventListener("resize", updateOverlayControls);
 window.addEventListener("keydown", onKeyDown);
 
 gridRects = buildGridRects();
@@ -1482,4 +1577,5 @@ resetColorGame();
 refreshAllLeaderboards();
 setActiveBoard("runner");
 activateGame("runner");
+updateOverlayControls();
 requestAnimationFrame(gameLoop);
